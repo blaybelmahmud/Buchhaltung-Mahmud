@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buchhaltung Mahmud</title>
+  <meta name="description" content="Buchhaltungs-Dashboard Mahmud">
+  <meta name="theme-color" content="#1e3a8a">
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --ink: #0f1117; --paper: #f0f4ff; --accent: #1e3a8a; --accent-light: #2563eb;
+      --accent2: #f59e0b; --accent3: #16a34a; --muted: #6b7280; --card: #ffffff;
+      --border: #dde3f0; --red: #dc2626;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Instrument Sans', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; }
+    .mono { font-family: 'DM Mono', monospace; }
+    
+    .app-header { background: var(--accent); color: #fff; padding: 0 1.5rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 2px solid var(--accent-light); }
+    .app-header .logo { font-family: 'DM Mono', monospace; font-weight: 500; font-size: 0.95rem; letter-spacing: 0.04em; color: #fff; }
+    .app-header .logo span { color: #93c5fd; }
+    
+    select.ctrl { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.25); padding: 0.35rem 0.8rem; border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 0.82rem; cursor: pointer; }
+    select.ctrl option { background: #1e3a8a; color: #fff; }
+    
+    .tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem; transition: transform 0.15s, box-shadow 0.15s; }
+    .tile:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+    .tile::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+    .tile.t1::before { background: var(--accent-light); }
+    .tile.t2::before { background: var(--accent2); }
+    .tile.t3::before { background: var(--accent3); }
+    .tile-num { font-family: 'DM Mono', monospace; font-size: 2.6rem; font-weight: 500; line-height: 1; margin-top: 0.4rem; letter-spacing: -2px; }
+    .tile.t1 .tile-num { color: var(--accent-light); }
+    .tile.t2 .tile-num { color: var(--accent2); }
+    .tile.t3 .tile-num { color: var(--accent3); }
+    
+    .dropzone { border: 2px dashed var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; cursor: pointer; background: #fff; transition: all 0.2s; margin-bottom: 1.1rem; }
+    .dropzone.drag-over { border-color: var(--accent3); background: #f0fdf4; }
+    .dropzone input[type=file] { display: none; }
+    
+    .tbl-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--card); }
+    table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+    thead th { background: var(--accent); color: #d1d5db; font-family: 'DM Mono', monospace; font-size: 0.7rem; padding: 0.85rem 1rem; text-align: left; text-transform: uppercase; white-space: nowrap; }
+    thead th:first-child { border-radius: 12px 0 0 0; }
+    thead th:last-child { border-radius: 0 12px 0 0; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f0f4ff; }
+    td { padding: 0.7rem 1rem; font-size: 0.875rem; vertical-align: middle; }
+    td.editable { cursor: pointer; transition: background 0.15s; position: relative; }
+    td.editable:hover { background: #dbeafe !important; }
+    td.editable:hover::after { content: '✏️'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 0.9rem; opacity: 0.6; }
+    
+    .badge { padding: 0.18rem 0.65rem; border-radius: 999px; font-size: 0.72rem; font-family: 'DM Mono', monospace; font-weight: 500; }
+    .badge-t1 { background: #dbeafe; color: #1dd84c; }
+    .badge-t2 { background: #fef3c7; color: #92400e; }
+    .badge-t3 { background: #dcfce7; color: #166534; }
+    
+    /* PDF Upload Zellen */
+    .pdf-upload-cell { text-align: center; cursor: pointer; padding: 0.5rem; transition: background 0.2s; }
+    .pdf-upload-cell:hover { background: #f3f4f6; }
+    .pdf-upload-cell.has-pdf { color: var(--accent3); font-weight: 600; }
+    .pdf-upload-cell.no-pdf { color: var(--muted); }
+    .pdf-upload-cell input[type=file] { display: none; }
+    
+    .btn-action { border: none; padding: 0.5rem 1.1rem; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity 0.2s; }
+    .btn-action:hover { opacity: 0.9; }
+    .btn-green { background: var(--accent3); color: #fff; }
+    .btn-blue { background: var(--accent-light); color: #fff; }
+    
+    #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #fff; padding: 0.7rem 1.2rem; border-radius: 8px; font-size: 0.82rem; opacity: 0; transform: translateY(8px); transition: all 0.25s; z-index: 999; pointer-events: none; }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
+    .modal-box { background: #fff; border-radius: 16px; width: 100%; max-width: 660px; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.3); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
+    .modal-body { flex: 1; overflow-y: auto; padding: 1.25rem; }
+    .modal-footer { padding: 1rem 1.25rem; border-top: 1px solid var(--border); display: flex; gap: 0.75rem; justify-content: flex-end; }
+    .btn-primary { background: var(--accent-light); color: #fff; border: none; border-radius: 6px; padding: 0.45rem 1rem; font-size: 0.82rem; cursor: pointer; }
+    .btn-secondary { background: #f3f4f6; color: #374151; border: none; border-radius: 6px; padding: 0.45rem 1rem; font-size: 0.82rem; cursor: pointer; }
+    .pdf-embed { width: 100%; height: 430px; border: 1px solid var(--border); border-radius: 8px; }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .new-row { animation: fadeIn 0.3s ease; }
+  </style>
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e3a8a">
+<script>
+if ('serviceWorker' in navigator) {
+window.addEventListener('load', () => {
+navigator.serviceWorker.register('./sw.js');
+});
+}
+</script>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="logo">Buchhaltung&nbsp;<span>Mahmud</span></div>
+  <div style="display:flex;gap:0.6rem;align-items:center;">
+    <label style="color:#93c5fd;font-size:0.7rem;font-family:'DM Mono',monospace;">JAHR</label>
+    <select id="yearSelect" class="ctrl" onchange="applyFilter()"></select>
+    <label style="color:#93c5fd;font-size:0.7rem;font-family:'DM Mono',monospace;">DIENST</label>
+    <select id="serviceSelect" class="ctrl" onchange="applyFilter()">
+      <option value="">Faktor X</option>
+      <option value="Steuererklärung">Steuererklärung</option>
+    </select>
+  </div>
+</header>
+
+<main style="max-width:1300px;margin:0 auto;padding:1.75rem 1.5rem;display:flex;flex-direction:column;gap:1.75rem;">
+
+  <!-- Tiles -->
+  <section>
+    <p style="font-family:'DM Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:0.7rem">Auftragsübersicht</p>
+    <div id="tilesContainer" style="display:flex;flex-direction:row;gap:1.1rem;">
+      <div class="tile t1" id="tile1" style="flex:1;min-width:0;position:relative;overflow:hidden;">
+        <p style="font-size:0.78rem;color:var(--muted);font-weight:500">Runter vom Gas</p>
+        <div class="tile-num" id="cnt1">0</div>
+        <p style="font-size:0.72rem;color:var(--muted);margin-top:0.4rem">Aufträge</p>
+      </div>
+      <div class="tile t2" id="tile2" style="flex:1;min-width:0;position:relative;overflow:hidden;">
+        <p style="font-size:0.78rem;color:var(--muted);font-weight:500">Vattenfall Aktion</p>
+        <div class="tile-num" id="cnt2">0</div>
+        <p style="font-size:0.72rem;color:var(--muted);margin-top:0.4rem">Aufträge</p>
+      </div>
+      <div class="tile t3" id="tile3" style="flex:1;min-width:0;position:relative;overflow:hidden;">
+        <p style="font-size:0.78rem;color:var(--muted);font-weight:500">S-Bahn Aktion</p>
+        <div class="tile-num" id="cnt3">0</div>
+        <p style="font-size:0.72rem;color:var(--muted);margin-top:0.4rem">Aufträge</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Table Section -->
+  <section>
+    <p style="font-family:'DM Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:0.7rem">Rechnungen & Belege</p>
+
+    <!-- Drag & Drop für Rechnungen -->
+    <div class="dropzone" id="dropzone" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" accept=".pdf" multiple onchange="handleFileInput(event)">
+      <p style="font-size:1.4rem;margin-bottom:0.3rem">📄</p>
+      <p style="font-weight:600;font-size:0.88rem;margin-bottom:0.2rem">Rechnung hier ablegen</p>
+      <p style="font-size:0.76rem;color:var(--muted)">Daten werden automatisch ausgelesen und in Tabelle eingefügt</p>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+      <button onclick="exportToExcel()" class="btn-action btn-green">📊 Excel Export</button>
+      <button class="btn-action btn-blue" onclick="addRow()">+ Zeile hinzufügen</button>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Absender</th>
+            <th>Datum</th>
+            <th>Projektnummer</th>
+            <th>Rechnungsnummer</th>
+            <th>Summe (€)</th>
+            <th>Art des Auftrags</th>
+            <th style="text-align:center">Rechnung</th>
+            <th style="text-align:center">Quittung</th>
+            <th style="text-align:center">Jobauftrag</th>
+            <th style="text-align:center">—</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Notes -->
+  <section>
+    <p style="font-family:'DM Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:0.7rem">Notizen</p>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;">
+      <textarea id="notes-textarea" placeholder="Anmerkungen, Hinweise oder Erinnerungen…" oninput="saveNotes()" style="width:100%;min-height:110px;border:none;outline:none;resize:vertical;font-family:inherit;font-size:0.9rem;color:var(--ink);background:transparent;line-height:1.6;"></textarea>
+    </div>
+    <p style="font-size:0.68rem;color:#bbb;margin-top:0.35rem;font-family:'DM Mono',monospace">Automatisch gespeichert · localStorage</p>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<!-- PDF Modal -->
+<div id="pdfModal" class="modal-overlay" style="display:none;" onclick="closeModalOverlay(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <p style="font-weight:700;font-size:0.95rem;" id="modalTitle">PDF Vorschau</p>
+        <p style="font-size:0.75rem;color:var(--muted);" id="modalSubtitle"></p>
+      </div>
+      <button onclick="closePdfModal()" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:#9ca3af;">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closePdfModal()">Schließen</button>
+      <button class="btn-primary" onclick="downloadPdf()">⬇ Herunterladen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  let rows = [];
+  let pdfStore = {}; // id → { rechnung: {name, dataUrl}, quittung: {...}, job: {...} }
+  let currentPdf = null;
+  let currentRowId = null;
+  let currentPdfType = null;
+  
+  const STORAGE_KEY = 'bm_rows_v8';
+  const NOTES_KEY = 'bm_notes_v8';
+  const SETTINGS_KEY = 'bm_settings_v8';
+  const PDF_KEY = 'bm_pdfs_v8';
+  const orderTypes = ['Runter vom Gas', 'Vattenfall Aktion', 'S-Bahn Aktion'];
+
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+
+  // ══════════════════════════════════════════════════════════════
+  // PDF-ANALYSE (VERBESSERT)
+  // ══════════════════════════════════════════════════════════════
+  async function extractTextFromPdf(dataUrl) {
+    try {
+      const loadingTask = pdfjsLib.getDocument(dataUrl);
+      const pdf = await loadingTask.promise;
+      
+      // Alle Seiten lesen (nicht nur erste!)
+      let fullText = '';
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
+      
+      console.log('=== PDF TEXT EXTRAHIERT ===');
+      console.log(fullText);
+      console.log('===========================');
+      
+      return fullText;
+    } catch (e) {
+      console.error('PDF-Analyse fehlgeschlagen:', e);
+      return "";
+    }
+  }
+
+  async function processPdfFileForRechnung(file) {
+    const reader = new FileReader();
+    reader.onload = async function(ev) {
+      const dataUrl = ev.target.result;
+      const pdfText = await extractTextFromPdf(dataUrl);
+      const newId = uid();
+
+      // === DATUM ===
+      let datum = new Date().toISOString().split('T')[0];
+      // Suche nach verschiedenen Formaten
+      const datePatterns = [
+        /Rechnungsdatum:\s*(\d{2}\.\d{2}\.\d{4})/i,
+        /Datum:\s*(\d{2}\.\d{2}\.\d{4})/i,
+        /(\d{2}\.\d{2}\.\d{4})/  // Fallback: irgendein Datum
+      ];
+      
+      for (const pattern of datePatterns) {
+        const match = pdfText.match(pattern);
+        if (match) {
+          const [d, m, y] = match[1].split('.');
+          datum = `${y}-${m}-${d}`;
+          console.log('✅ Datum gefunden:', datum, 'aus:', match[1]);
+          break;
+        }
+      }
+      if (datum === new Date().toISOString().split('T')[0]) {
+        console.log('⚠️ Kein Datum im PDF gefunden, verwende heutiges Datum');
+      }
+
+      // === PROJEKTNUMMER ===
+      let projektnummer = "–";
+      const projPatterns = [
+        /Projektnummer:\s*(\d+)/i,
+        /Projekt:\s*(\d+)/i,
+        /Projekt-Nr\.?:\s*(\d+)/i
+      ];
+      
+      for (const pattern of projPatterns) {
+        const match = pdfText.match(pattern);
+        if (match) {
+          projektnummer = match[1];
+          console.log('✅ Projektnummer gefunden:', projektnummer);
+          break;
+        }
+      }
+      if (projektnummer === "–") {
+        console.log('⚠️ Keine Projektnummer gefunden');
+        console.log('💡 Tipp: PDF muss "Projektnummer: 12345" enthalten');
+      }
+
+      // === RECHNUNGSNUMMER ===
+      let rechnungsnummer = "–";
+      const nrPatterns = [
+        /Rechnungsnummer:\s*([\dA-Z\-]+)/i,
+        /Rechnung Nr\.?:\s*([\dA-Z\-]+)/i,
+        /Invoice No\.?:\s*([\dA-Z\-]+)/i,
+        /RE[:\s\-]*(\d+)/i
+      ];
+      
+      for (const pattern of nrPatterns) {
+        const match = pdfText.match(pattern);
+        if (match) {
+          rechnungsnummer = match[1];
+          console.log('✅ Rechnungsnummer gefunden:', rechnungsnummer);
+          break;
+        }
+      }
+      if (rechnungsnummer === "–") {
+        console.log('⚠️ Keine Rechnungsnummer gefunden');
+        console.log('💡 Tipp: PDF muss "Rechnungsnummer: RE-123" enthalten');
+      }
+
+      // === SUMME ===
+      let summe = "0,00";
+      const sumPatterns = [
+        /Rechnungsbetrag:\s*(\d+[.,]\d{2})/i,
+        /Betrag:\s*(\d+[.,]\d{2})/i,
+        /Summe:\s*(\d+[.,]\d{2})/i,
+        /Total:\s*(\d+[.,]\d{2})/i,
+        /€\s*(\d+[.,]\d{2})/,
+        /(\d+[.,]\d{2})\s*€/
+      ];
+      
+      for (const pattern of sumPatterns) {
+        const match = pdfText.match(pattern);
+        if (match) {
+          summe = match[1].replace('.',',');
+          console.log('✅ Summe gefunden:', summe);
+          break;
+        }
+      }
+      if (summe === "0,00") {
+        console.log('⚠️ Keine Summe gefunden');
+        console.log('💡 Tipp: PDF muss "Rechnungsbetrag: 1.250,00" enthalten');
+      }
+
+      // === ART DES AUFTRAGS ===
+      let art = 'Runter vom Gas';
+      if (pdfText.toLowerCase().includes("vattenfall")) art = 'Vattenfall Aktion';
+      if (pdfText.toLowerCase().includes("s-bahn") || pdfText.toLowerCase().includes("sbahn")) art = 'S-Bahn Aktion';
+      console.log('✅ Art ermittelt:', art);
+
+      // PDF speichern
+      if (!pdfStore[newId]) pdfStore[newId] = {};
+      pdfStore[newId].rechnung = { name: file.name, dataUrl };
+      savePdfs();
+
+      // Zeile hinzufügen
+      rows.push({
+        id: newId,
+        absender: 'Faktor X',
+        datum,
+        projektnummer,
+        rechnungsnummer,
+        summe,
+        art
+      });
+
+      saveData();
+      applyFilter();
+      showToast(`✅ "${file.name}" analysiert und hinzugefügt`);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // UPLOAD FÜR QUITTUNG / JOBAUFTRAG (per Klick)
+  // ══════════════════════════════════════════════════════════════
+  function uploadPdfForCell(rowId, type) {
+    currentRowId = rowId;
+    currentPdfType = type;
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (!pdfStore[rowId]) pdfStore[rowId] = {};
+        pdfStore[rowId][type] = { name: file.name, dataUrl: ev.target.result };
+        savePdfs();
+        applyFilter();
+        showToast(`✅ ${type === 'quittung' ? 'Quittung' : 'Jobauftrag'} hochgeladen`);
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════════════
+  function renderTable(isNew = false, filteredRows = null) {
+    const data = filteredRows !== null ? filteredRows : rows;
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted);">Keine Einträge gefunden</td></tr>';
+      return;
+    }
+
+    data.forEach((row, i) => {
+      const tr = document.createElement('tr');
+      if (isNew && i === data.length - 1) tr.classList.add('new-row');
+
+      const pdfs = pdfStore[row.id] || {};
+      const hasRechnung = !!pdfs.rechnung;
+      const hasQuittung = !!pdfs.quittung;
+      const hasJob = !!pdfs.job;
+
+      tr.innerHTML = `
+        <td class="editable" onclick="editCell('${row.id}', 'absender')">${esc(row.absender)}</td>
+        <td class="editable mono" onclick="editCell('${row.id}', 'datum')">${esc(row.datum)}</td>
+        <td class="editable mono" onclick="editCell('${row.id}', 'projektnummer')">${esc(row.projektnummer)}</td>
+        <td class="editable mono" onclick="editCell('${row.id}', 'rechnungsnummer')">${esc(row.rechnungsnummer)}</td>
+        <td class="editable mono" onclick="editCell('${row.id}', 'summe')">${esc(row.summe)}</td>
+        <td onclick="editCell('${row.id}', 'art')" style="cursor:pointer;">${buildArtBadge(row.art)}</td>
+        <td class="pdf-upload-cell ${hasRechnung?'has-pdf':'no-pdf'}" onclick="${hasRechnung ? `viewPdf('${row.id}','rechnung')` : `uploadPdfForCell('${row.id}','rechnung')`}" title="${hasRechnung ? 'PDF anzeigen' : 'PDF hochladen'}">
+          ${hasRechnung ? '✅' : '📤 Upload'}
+        </td>
+        <td class="pdf-upload-cell ${hasQuittung?'has-pdf':'no-pdf'}" onclick="${hasQuittung ? `viewPdf('${row.id}','quittung')` : `uploadPdfForCell('${row.id}','quittung')`}" title="${hasQuittung ? 'PDF anzeigen' : 'PDF hochladen'}">
+          ${hasQuittung ? '✅' : '📤 Upload'}
+        </td>
+        <td class="pdf-upload-cell ${hasJob?'has-pdf':'no-pdf'}" onclick="${hasJob ? `viewPdf('${row.id}','job')` : `uploadPdfForCell('${row.id}','job')`}" title="${hasJob ? 'PDF anzeigen' : 'PDF hochladen'}">
+          ${hasJob ? '✅' : '📤 Upload'}
+        </td>
+        <td style="text-align:center">
+          <button onclick="deleteRow('${row.id}')" style="color:var(--red);border:none;background:none;cursor:pointer;font-size:1rem;" title="Löschen">✕</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function esc(s) { return String(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function buildArtBadge(art) {
+    const cls = art === 'Runter vom Gas' ? 'badge-t1' : art === 'Vattenfall Aktion' ? 'badge-t2' : 'badge-t3';
+    return `<span class="badge ${cls}">${esc(art)}</span>`;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // EDITING
+  // ══════════════════════════════════════════════════════════════
+  function editCell(id, field) {
+    const row = rows.find(r => r.id === id);
+    if (!row) return;
+
+    if (field === 'art') {
+      const cell = event.target.closest('td');
+      if (!cell) return;
+      
+      const select = document.createElement('select');
+      select.style.cssText = 'width:100%;padding:0.4rem;border:2px solid var(--accent-light);border-radius:6px;font-size:0.875rem;background:#fff;outline:none;';
+      
+      orderTypes.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type;
+        option.textContent = type;
+        if (type === row[field]) option.selected = true;
+        select.appendChild(option);
+      });
+      
+      cell.innerHTML = '';
+      cell.appendChild(select);
+      select.focus();
+      
+      const save = () => { row[field] = select.value; saveData(); applyFilter(); };
+      select.addEventListener('change', save);
+      select.addEventListener('blur', save);
+      select.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') save();
+        if (e.key === 'Escape') applyFilter();
+      });
+      
+      return;
+    }
+
+    const val = prompt(`Neuer Wert für ${field}:`, row[field]);
+    if (val !== null) { 
+      row[field] = val; 
+      saveData(); 
+      applyFilter(); 
+    }
+  }
+
+  function addRow() {
+    const today = new Date().toISOString().split('T')[0];
+    rows.push({ 
+      id: uid(), 
+      absender: 'Faktor X', 
+      datum: today, 
+      projektnummer: '–', 
+      rechnungsnummer: '–', 
+      summe: '0,00', 
+      art: 'Runter vom Gas'
+    });
+    saveData();
+    applyFilter();
+  }
+
+  function deleteRow(id) {
+    if (confirm("Eintrag wirklich löschen?")) {
+      rows = rows.filter(r => r.id !== id);
+      delete pdfStore[id];
+      saveData();
+      savePdfs();
+      applyFilter();
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // PDF MODAL
+  // ══════════════════════════════════════════════════════════════
+  function viewPdf(rowId, type) {
+    const pdf = pdfStore[rowId]?.[type];
+    const row = rows.find(r => r.id === rowId);
+    if (!pdf) return;
+    
+    currentPdf = pdf;
+    const typeLabel = type === 'rechnung' ? 'Rechnung' : type === 'quittung' ? 'Quittung' : 'Jobauftrag';
+    document.getElementById('modalTitle').textContent = `${typeLabel}: ${pdf.name}`;
+    document.getElementById('modalSubtitle').textContent = row ? `${row.absender} · ${row.datum}` : '';
+    
+    const body = document.getElementById('modalBody');
+    if (pdf.dataUrl && pdf.dataUrl.startsWith('data:application/pdf')) {
+      body.innerHTML = `<iframe class="pdf-embed" src="${pdf.dataUrl}"></iframe>`;
+    } else {
+      body.innerHTML = `<div style="text-align:center;padding:3rem;"><p style="font-size:2.5rem;margin-bottom:1rem;">📄</p><p style="font-weight:600;margin-bottom:0.5rem;">${esc(pdf.name)}</p><p style="font-size:0.85rem;color:var(--muted);">Vorschau nicht verfügbar — bitte herunterladen</p></div>`;
+    }
+    document.getElementById('pdfModal').style.display = 'flex';
+  }
+
+  function closePdfModal() {
+    document.getElementById('pdfModal').style.display = 'none';
+    document.getElementById('modalBody').innerHTML = '';
+    currentPdf = null;
+  }
+
+  function closeModalOverlay(e) {
+    if (e.target === document.getElementById('pdfModal')) closePdfModal();
+  }
+
+  function downloadPdf() {
+    if (!currentPdf) return;
+    const a = document.createElement('a');
+    a.href = currentPdf.dataUrl;
+    a.download = currentPdf.name;
+    a.click();
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // DRAG & DROP
+  // ══════════════════════════════════════════════════════════════
+  function handleDragOver(e) { 
+    e.preventDefault(); 
+    document.getElementById('dropzone').classList.add('drag-over'); 
+  }
+  
+  function handleDragLeave() { 
+    document.getElementById('dropzone').classList.remove('drag-over'); 
+  }
+  
+  function handleDrop(e) { 
+    e.preventDefault(); 
+    handleDragLeave(); 
+    [...e.dataTransfer.files].filter(f=>f.name.toLowerCase().endsWith('.pdf')).forEach(processPdfFileForRechnung); 
+  }
+  
+  function handleFileInput(e) { 
+    [...e.target.files].forEach(processPdfFileForRechnung); 
+    e.target.value=''; 
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // EXCEL EXPORT
+  // ══════════════════════════════════════════════════════════════
+  function exportToExcel() {
+    const year = document.getElementById('yearSelect').value;
+    const service = document.getElementById('serviceSelect').value;
+    
+    const dataToExport = rows
+      .filter(r => (!year || r.datum.startsWith(year)) && (!service || r.art === service))
+      .map(r => {
+        const pdfs = pdfStore[r.id] || {};
+        return {
+          Absender: r.absender,
+          Datum: r.datum,
+          Projektnummer: r.projektnummer,
+          Rechnungsnummer: r.rechnungsnummer,
+          "Summe (€)": r.summe,
+          "Art des Auftrags": r.art,
+          Rechnung: pdfs.rechnung ? 'Ja' : 'Nein',
+          Quittung: pdfs.quittung ? 'Ja' : 'Nein',
+          Jobauftrag: pdfs.job ? 'Ja' : 'Nein'
+        };
+      });
+
+    if (dataToExport.length === 0) {
+      alert("Keine Daten zum Exportieren vorhanden!");
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Buchhaltung");
+
+    // Analyse
+    const analyseData = [];
+    analyseData.push(['BUCHHALTUNGS-ANALYSE']);
+    analyseData.push([`Jahr: ${year || 'Alle'}`]);
+    analyseData.push([`Dienst: ${service || 'Alle'}`]);
+    analyseData.push([`Erstellt: ${new Date().toLocaleDateString('de-DE')}`]);
+    analyseData.push([]);
+    
+    const summen = dataToExport.map(r => parseFloat(r["Summe (€)"].replace(',','.')));
+    const gesamtsumme = summen.reduce((a,b) => a+b, 0);
+    
+    analyseData.push(['KENNZAHLEN']);
+    analyseData.push(['Einträge', dataToExport.length]);
+    analyseData.push(['Gesamtsumme (€)', gesamtsumme.toFixed(2).replace('.',',')]);
+    analyseData.push(['Durchschnitt (€)', (gesamtsumme / summen.length).toFixed(2).replace('.',',')]);
+    analyseData.push([]);
+    
+    analyseData.push(['NACH AUFTRAGSART']);
+    analyseData.push(['Art', 'Anzahl', 'Summe (€)']);
+    orderTypes.forEach(type => {
+      const filtered = dataToExport.filter(r => r["Art des Auftrags"] === type);
+      const sum = filtered.map(r => parseFloat(r["Summe (€)"].replace(',','.'))).reduce((a,b) => a+b, 0);
+      analyseData.push([type, filtered.length, sum.toFixed(2).replace('.',',')]);
+    });
+    
+    const analyseSheet = XLSX.utils.aoa_to_sheet(analyseData);
+    XLSX.utils.book_append_sheet(workbook, analyseSheet, "Analyse");
+
+    const fileName = `Buchhaltung_Mahmud_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+    showToast("✅ Excel exportiert (siehe 'Analyse'-Sheet)");
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // FILTER
+  // ══════════════════════════════════════════════════════════════
+  function applyFilter() {
+    saveSettings();
+    const selYear = document.getElementById('yearSelect').value;
+    const selService = document.getElementById('serviceSelect').value;
+
+    const filtered = rows.filter(row => {
+      const rowYear = row.datum ? row.datum.slice(0,4) : '';
+      const yearOk = !selYear || rowYear === selYear;
+      const svcOk = !selService || row.art === selService;
+      return yearOk && svcOk;
+    });
+
+    orderTypes.forEach((t, i) => {
+      const tile = document.getElementById(`tile${i+1}`);
+      if (!selService || selService === t) {
+        tile.style.display = '';
+        document.getElementById(`cnt${i+1}`).textContent = filtered.filter(r => r.art === t).length;
+      } else {
+        tile.style.display = 'none';
+      }
+    });
+
+    renderTable(false, filtered);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // STORAGE
+  // ══════════════════════════════════════════════════════════════
+  function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); }
+  function loadData() { const r = localStorage.getItem(STORAGE_KEY); if (r) rows = JSON.parse(r); else rows = getSampleData(); }
+  function saveNotes() { localStorage.setItem(NOTES_KEY, document.getElementById('notes-textarea').value); }
+  function loadNotes() { const n = localStorage.getItem(NOTES_KEY); if (n) document.getElementById('notes-textarea').value = n; }
+  function saveSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ year: document.getElementById('yearSelect').value, service: document.getElementById('serviceSelect').value })); }
+  function loadSettings() { const r = localStorage.getItem(SETTINGS_KEY); if (r) { const s = JSON.parse(r); document.getElementById('yearSelect').value = s.year || new Date().getFullYear(); document.getElementById('serviceSelect').value = s.service || ''; }}
+  function savePdfs() { try { localStorage.setItem(PDF_KEY, JSON.stringify(pdfStore)); } catch(e) { console.warn('PDF-Speicher voll'); }}
+  function loadPdfs() { const r = localStorage.getItem(PDF_KEY); if (r) pdfStore = JSON.parse(r); }
+
+  function getSampleData() {
+    return [
+      { id: uid(), absender: 'Faktor X', datum: '2025-01-15', projektnummer: 'P-2025-001', rechnungsnummer: 'RE-2025-0042', summe: '1.250,00', art: 'Runter vom Gas' },
+      { id: uid(), absender: 'Faktor X', datum: '2025-02-03', projektnummer: 'P-2025-002', rechnungsnummer: 'RE-2025-0078', summe: '840,00', art: 'Vattenfall Aktion' },
+      { id: uid(), absender: 'Faktor X', datum: '2025-03-22', projektnummer: 'P-2025-003', rechnungsnummer: 'RE-2025-0095', summe: '3.200,00', art: 'S-Bahn Aktion' }
+    ];
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // INIT
+  // ══════════════════════════════════════════════════════════════
+  window.onload = () => {
+    const sel = document.getElementById('yearSelect');
+    const cur = new Date().getFullYear();
+    for (let y = 2020; y <= cur + 3; y++) {
+      const o = document.createElement('option');
+      o.value = y;
+      o.textContent = y;
+      if (y === cur) o.selected = true;
+      sel.appendChild(o);
+    }
+    
+    loadSettings();
+    loadPdfs();
+    loadData();
+    loadNotes();
+    applyFilter();
+    
+    console.log('%c📄 PDF-Analyse Tipps:', 'font-weight:bold;font-size:14px;');
+    console.log('PDFs müssen diese Schlüsselwörter enthalten:');
+    console.log('  • Rechnungsdatum: 15.01.2025');
+    console.log('  • Projektnummer: 12345');
+    console.log('  • Rechnungsnummer: RE-2025-0042');
+    console.log('  • Rechnungsbetrag: 1.250,00');
+  };
+</script>
+</body>
+</html>
